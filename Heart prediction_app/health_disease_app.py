@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib # Import joblib to load the saved model and preprocessors
+import pickle # Changed from joblib to pickle
 
 # --- Streamlit App Layout (MUST BE FIRST STREAMLIT COMMAND) ---
 st.set_page_config(
@@ -16,22 +16,25 @@ st.markdown("---")
 # --- Load the Trained Model and Preprocessors ---
 # Ensure these files are in the same directory as your app.py
 try:
-    loaded_model = joblib.load('gaussian_naive_bayes_model.joblib')
-    loaded_scaler = joblib.load('minmax_scaler.joblib')
-    loaded_selector = joblib.load('mi_feature_selector.joblib')
-    # Load the full list of columns after one-hot encoding (before scaling)
-    full_encoded_columns = joblib.load('full_encoded_columns.joblib')
-    # Load the list of columns that the scaler was fitted on (all columns after OHE and before selector)
-    scaler_fit_columns = joblib.load('scaler_fit_columns.joblib')
-    # Load the list of columns that the selector expects as input
-    selector_input_columns = joblib.load('selector_input_columns.joblib')
+    with open('gaussian_naive_bayes_model.pkl', 'rb') as file: # Changed to pickle and .pkl
+        loaded_model = pickle.load(file)
+    with open('minmax_scaler.pkl', 'rb') as file: # Changed to pickle and .pkl
+        loaded_scaler = pickle.load(file)
+    with open('mi_feature_selector.pkl', 'rb') as file: # Changed to pickle and .pkl
+        loaded_selector = pickle.load(file)
+    with open('full_encoded_columns.pkl', 'rb') as file: # Changed to pickle and .pkl
+        full_encoded_columns = pickle.load(file)
+    with open('scaler_fit_columns.pkl', 'rb') as file: # Changed to pickle and .pkl
+        scaler_fit_columns = pickle.load(file)
+    with open('selector_input_columns.pkl', 'rb') as file: # Changed to pickle and .pkl
+        selector_input_columns = pickle.load(file)
 
     st.sidebar.success("Model, scaler, selector, and column lists loaded successfully!")
 except FileNotFoundError:
-    st.sidebar.error("Error: Model files not found. Please run 'train_model.py' first to generate them.")
+    st.sidebar.error("Error: Model files not found. Please run 'train_and_save_model.py' first to generate them.")
     st.stop() # Stop the app if model files are not found
 
-# --- Feature Mapping for User Input (Consistent with train_model.py) ---
+# --- Feature Mapping for User Input (Consistent with train_and_save_model.py) ---
 # These mappings ensure the user's input is correctly transformed into the format
 # expected by the trained model (specifically for one-hot encoding).
 
@@ -93,7 +96,6 @@ def predict_heart_disease(features_dict):
     Applies the same preprocessing steps as during training.
     """
     # 1. Create an empty DataFrame with all expected columns from the training data (after OHE), initialized to zeros.
-    # This ensures all one-hot encoded columns are present and in the correct order.
     processed_input_df = pd.DataFrame(0, index=[0], columns=full_encoded_columns)
 
     # 2. Populate numerical features directly
@@ -108,29 +110,18 @@ def predict_heart_disease(features_dict):
     processed_input_df['ca'] = features_dict['ca']
 
     # 3. Populate one-hot encoded categorical features
-    # Map the integer value back to the one-hot encoded column name and set its value to 1
     processed_input_df[f'cp_{features_dict["cp"]}'] = 1
     processed_input_df[f'restecg_{features_dict["restecg"]}'] = 1
     processed_input_df[f'slope_{features_dict["slope"]}'] = 1
     processed_input_df[f'thal_{features_dict["thal"]}'] = 1
 
-    # At this point, `processed_input_df` has the correct columns and values,
-    # matching the structure of `X` (before scaling) in `train_model.py`.
-
     # 4. Apply scaling using the loaded scaler.
-    # The scaler was fitted on `scaler_fit_columns`. We ensure input matches this.
-    # Since `scaler_fit_columns` should be identical to `full_encoded_columns`
-    # (as all columns become numerical after OHE and are passed to scaler),
-    # we can pass `processed_input_df` directly.
     scaled_input_array = loaded_scaler.transform(processed_input_df[scaler_fit_columns])
     
     # 5. Convert the scaled NumPy array back to a DataFrame,
-    # explicitly assigning the column names that the selector expects as input.
-    # This is the most critical step to ensure column alignment for the selector.
     scaled_input_df = pd.DataFrame(scaled_input_array, columns=selector_input_columns)
 
     # 6. Apply feature selection using the loaded selector.
-    # The selector expects the features it was fitted on, which are now the columns in scaled_input_df.
     selected_input = loaded_selector.transform(scaled_input_df)
 
     # Make prediction
@@ -185,7 +176,6 @@ with st.form("prediction_form"):
 
     if submitted:
         # Prepare features for prediction
-        # The dictionary now contains the integer-mapped values for categorical inputs
         input_features = {
             'age': age,
             'sex': sex,
@@ -215,4 +205,5 @@ with st.form("prediction_form"):
 
         st.markdown("---")
         st.write("Input Features Provided:")
-        st.json(input_features)
+        st.json(input_features
+
